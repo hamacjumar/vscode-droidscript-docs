@@ -51,6 +51,10 @@
         "title": "DroidScript Docs: Select Command"
       },
       {
+        "command": "droidscript-docs.allCommands",
+        "title": "DroidScript Docs: All Commands"
+      },
+      {
         "command": "droidscript-docs.preview",
         "title": "DroidScript Docs: Open Preview"
       }

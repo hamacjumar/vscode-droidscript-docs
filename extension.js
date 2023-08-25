@@ -8,7 +8,7 @@ const pkg = require("./package.json");
 
 const cmdPrefix = "droidscript-docs.";
 const titlePrefix = "DroidScript Docs: ";
-const commands = ["generateDocs", "clean", "update"];
+const commands = ["generateDocs", "clean", "update", "allCommands"];
 /** @type {CmdMap} */
 const cmdMap = Object.assign({}, ...pkg.contributes.commands.map(c =>
     ({ [c.command.replace(cmdPrefix, "")]: c.title.replace(titlePrefix, "") })
@@ -81,6 +81,7 @@ function activate(context) {
     subscribe("clean", () => generate({ clean: true }));
     subscribe("update", () => generate({ update: true }));
     subscribe("selectCommand", selectCommand);
+    subscribe("allCommands", selectCommand.bind(null, true));
     subscribe("filterLanguage", () => selectFilter(conf.langs, "Pick Language", languageFilter).then(s => s && (languageFilter = s)));
     subscribe("filterVersion", () => selectFilter(conf.vers, "Pick Version", versionFilter).then(s => s && (versionFilter = s)));
     subscribe("filterScope", () => selectFilter(conf.scopes, "Pick Scope", scopeFilter).then(s => s && (scopeFilter = s)));
@@ -171,8 +172,8 @@ async function selectFilter(list, title, dflt = "*") {
     return res && res.split(' ')[0];
 }
 
-async function selectCommand() {
-    const items = commands.map(c => cmdMap[c]);
+async function selectCommand(all = false) {
+    const items = all ? Object.values(cmdMap) : commands.map(c => cmdMap[c]);
     const title = await vscode.window.showQuickPick(items, {
         canPickMany: false, title: "Select Command", placeHolder: "Generate"
     });
