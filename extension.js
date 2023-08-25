@@ -24,7 +24,6 @@ let generateBtn;
 /** @type {vscode.WebviewPanel} */
 let webViewPanel;
 
-let serverIsRunning = false;
 let languageFilter = "*", versionFilter = "*", scopeFilter = "*", nameFilter = "*";
 let lastCommand = "", working = false;
 
@@ -108,6 +107,7 @@ function generate(options = generateOptions) {
 
     chn.clear();
     chn.show();
+    vscode.commands.executeCommand('livePreview.end');
 
     // Execute the Docs/files/jsdoc-parser.js file
     processHandler(exec(`node ${jsdocParserFilePath}`, (error, stdout, stderr) => {
@@ -161,15 +161,10 @@ async function selectCommand() {
 }
 
 async function openWithLiveServer() {
-    if (serverIsRunning) return;
     const docsPath = path.join(folderPath, "out", "docs", "Docs.htm");
     if (!fs.existsSync(docsPath)) return;
     const fileUri = vscode.Uri.file(docsPath);
-    const document = await vscode.workspace.openTextDocument(fileUri);
-    await vscode.window.showTextDocument(document);
-    await vscode.commands.executeCommand('extension.liveServer.goOnline');
-    serverIsRunning = true;
-    // openDocs();
+    await vscode.commands.executeCommand('livePreview.start.preview.atFile', fileUri);
 }
 
 /** @type {vscode.CompletionItemProvider["provideCompletionItems"]} */
