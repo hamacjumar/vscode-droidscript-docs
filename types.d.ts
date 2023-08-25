@@ -6,12 +6,13 @@ declare global {
     }
 
     type DSConfig = {
-        scopes: Obj<string>;
         langs: Obj<string>;
+        vers: string[];
+        scopes: Obj<string>;
         regHide: string;
         regControl: string;
         tname: Obj<string>;
-        tdesc: Obj<string>
+        tdesc: Obj<string>;
     }
 
     type PkgCmds = typeof pkg.contributes.commands;
