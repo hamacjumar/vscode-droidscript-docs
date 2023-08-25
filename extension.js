@@ -85,9 +85,8 @@ function activate(context) {
     subscribe("filterVersion", () => selectFilter("files/json/*/*", "Pick Version").then(s => s && (versionFilter = s)));
     subscribe("filterScope", () => selectFilter("files/json/*/*/*", "Pick Scope").then(s => s && (scopeFilter = s)));
 
-    vscode.languages.registerCompletionItemProvider('javascript', {
-        provideCompletionItems
-    });
+    vscode.languages.registerCompletionItemProvider('javascript', { provideCompletionItems });
+    vscode.languages.registerCompletionItemProvider('markdown', { provideCompletionItems });
 }
 
 // This method is called when your extension is deactivated
@@ -171,22 +170,16 @@ async function openWithLiveServer() {
 function provideCompletionItems(doc, pos, token, context) {
     const ln = pos.line;
     const cd = doc.lineAt(ln).text;
+    const area = cd.slice(Math.max(pos.character - 12, 0), pos.character);
 
-    if (!cd.includes("@param") && !cd.includes("@return")) return;
+    if (!cd.includes("@param") && !cd.includes("@return") && !area.match(/\w+(:|\|\|)\w*/)) return;
 
-    const completionItems = Object.keys(tnames).map(m => {
-        return new vscode.CompletionItem(m, vscode.CompletionItemKind.Property);
+    const completionItems = Object.keys(tnames).map(a => {
+        const item = new vscode.CompletionItem(a, vscode.CompletionItemKind.Property);
+        let b = a.split(/\\?_/)[0];
+        item.detail = b ? tnames[b] + ": " + tnames[a] : tnames[a];
+        return item;
     });
-
-    // Customize your completion items
-    completionItems.forEach(item => {
-        let a = typeof item.label == "string" ? item.label : item.label.label;
-        item.insertText = a;
-        let b = a.includes("_") ? a.split("_")[0] : "";
-        item.detail = b ? tnames[b] + " : " + tnames[a] : tnames[a];
-    });
-
-    // Add more completion items as needed
 
     return completionItems;
 }
