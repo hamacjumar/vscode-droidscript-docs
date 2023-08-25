@@ -41,6 +41,10 @@
       {
         "command": "droidscript-docs.filterScope",
         "title": "DroidScript Docs: Scope Filter"
+      },
+      {
+        "command": "droidscript-docs.selectCommand",
+        "title": "DroidScript Docs: Select Command"
       }
     ]
   },

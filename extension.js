@@ -1,91 +1,39 @@
 const vscode = require("vscode");
 const fs = require("fs");
 const fsp = fs.promises;
-const { exec } = require("child_process");
+const { exec, ChildProcess } = require("child_process");
 const path = require("path");
 const glob = require("glob");
+const pkg = require("./package.json");
+
+const cmdPrefix = "droidscript-docs.";
+const titlePrefix = "DroidScript Docs: ";
+const commands = ["generateDocs", "clean", "update"];
+/** @type {CmdMap} */
+const cmdMap = Object.assign({}, ...pkg.contributes.commands.map(c =>
+    ({ [c.command.replace(cmdPrefix, "")]: c.title.replace(titlePrefix, "") })
+));
 
 let folderPath = "";
 let generateJSFilePath = "files/generate.js";
 let jsdocParserFilePath = "files/jsdoc-parser.js";
+let confPath = "files/conf.json";
+
 /** @type {vscode.StatusBarItem} */
 let generateBtn;
 /** @type {vscode.WebviewPanel} */
 let webViewPanel;
+
 let serverIsRunning = false;
-let languageFilter = "", versionFilter = "", scopeFilter = "", nameFilter = "";
+let languageFilter = "*", versionFilter = "*", scopeFilter = "*", nameFilter = "*";
+let lastCommand = "", working = false;
 
-/** @type {{[x:string]:string}} */
-const tnames = {
-    "all": "all types",
-    "bin": "Boolean",
-    "dso": "app object",
-    "gvo": "game object",
-    "swo": "smartwatch object",
-    "jso": "JavaScript object",
-    "fnc": "Function",
-    "lst": "List",
-    "num": "Number",
-    "obj": "Object",
-    "str": "String",
-    "?": "unknown",
-    "ui": "ui object",
+/** @type {DSConfig} */
+let conf;
+/** @type {Obj<string>} */
+let tnames = {};
 
-    "lst_obj": "of objects",
-    "lst_num": "of numbers",
-    "num_byt": "bytes",
-    "num_col": "hexadecimal 0xrrggbb",
-    "num_dat": "datetime in milliseconds (from JS Date object)",
-    "num_deg": "angle in degrees (0..360)",
-    "num_dhx": "0-255",
-    "num_fac": "factor",
-    "num_flt": "float",
-    "num_fps": "frames per second",
-    "num_frc": "fraction (0..1)",
-    "num_gbt": "gigabytes",
-    "num_hrz": "hertz",
-    "num_int": "integer",
-    "num_met": "meters",
-    "num_mls": "milliseconds",
-    "num_mtu": "maximum transmission unit",
-    "num_prc": "percent",
-    "num_pxl": "pixel",
-    "num_rad": "angle in radient (0..2*π)",
-    "num_sec": "seconds",
-    "str_acc": "account Email",
-    "str_b64": "base64 encoded",
-    "str_col": "<br>&nbsp;&nbsp;hexadecimal: “#rrggbb”, “#aarrggbb”<br>&nbsp;&nbsp;colourName: “red”, “green”, ...",
-    "str_com": "comma “,” separated",
-    "str_eml": "comma separated email addresses or names",
-    "str_flt": "float",
-    "str_fmt": "format",
-    "str_htm": "html code",
-    "str_hex": "hexadecimal “00”..“FF”",
-    "str_int": "integer",
-    "str_jsc": "javascript code",
-    "str_jsn": "JSON object",
-    "str_lst": "separated",
-    "str_mim": "mimetype",
-    "str_mod": "mode",
-    "str_num": "number",
-    "str_oid": "object id “#id”",
-    "str_ort": "“Default”, “Portrait”, “Landscape”",
-    "str_pip": "pipe “|” separated",
-    "str_ptc": "file path or content:// uri",
-    "str_pth": "path to file or folder ( “/absolute/...” or “relative/...” )",
-    "str_ptf": "path to file ( “/absolute/...” or “relative/...” )",
-    "str_ptd": "path to folder ( “/absolute/...” or “relative/...” )",
-    "str_pfa": "“/absolute/...” path to a file",
-    "str_pfr": "“relative/...” path to a file",
-    "str_pda": "“/absolute/...” path to a folder",
-    "str_pdr": "“relative/...” path to a folder",
-    "str_pxl": "integer in pixels",
-    "str_smc": "semicolon “;” separated",
-    "str_sql": "sql code",
-    "str_sty": "style",
-    "str_uri": "URI encoded",
-    "str_url": "url path"
-};
+const chn = vscode.window.createOutputChannel("Docs Debug");
 
 /** @param {vscode.ExtensionContext} context */
 function activate(context) {
@@ -96,28 +44,47 @@ function activate(context) {
     folderPath = cw.uri.fsPath;
     generateJSFilePath = path.join(folderPath, generateJSFilePath);
     jsdocParserFilePath = path.join(folderPath, jsdocParserFilePath);
+    confPath = path.join(folderPath, confPath);
 
     if (!fs.existsSync(generateJSFilePath)) return;
     if (!fs.existsSync(jsdocParserFilePath)) return;
+    if (!fs.existsSync(confPath)) return;
+
+    fs.readFile(confPath, "utf8", async (err, data) => {
+        let error = "";
+        if (err) error = err.name + ": " + err.message;
+        else try {
+            conf = JSON.parse(data);
+            Object.assign(tnames, conf.tname, conf.tdesc);
+        }
+        catch (e) { error = "Reading conf.json: " + e.message; }
+        if (error) await vscode.window.showErrorMessage(error);
+    });
 
     generateBtn = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
-    generateBtn.command = "droidscript-docs.generateDocs";
-    generateBtn.text = "$(tools) Generate Docs";
-    generateBtn.tooltip = "DroidScript Docs: Generate";
+    generateBtn.command = cmdPrefix + "selectCommand";
+    generateBtn.text = "$(tools) Docs: Select";
+    generateBtn.tooltip = "Select Command";
     generateBtn.show();
 
     vscode.workspace.onDidChangeTextDocument(event => {
         // Handle the event, for example, update the status bar icon
-        generateBtn.text = "$(tools) Generate Docs";
-        generateBtn.tooltip = "DroidScript Docs: Generate";
+        //generateBtn.text = "$(tools) Generate Docs";
+        //generateBtn.tooltip = cmdMap.generateDocs;
     });
 
-    context.subscriptions.push(vscode.commands.registerCommand("droidscript-docs.generateDocs", generateDocs));
-    context.subscriptions.push(vscode.commands.registerCommand("droidscript-docs.clean", cleanDocs));
-    context.subscriptions.push(vscode.commands.registerCommand("droidscript-docs.update", updateDocs));
-    context.subscriptions.push(vscode.commands.registerCommand("droidscript-docs.filterLanguage", filterLanguage));
-    context.subscriptions.push(vscode.commands.registerCommand("droidscript-docs.filterVersion", filterVersion));
-    context.subscriptions.push(vscode.commands.registerCommand("droidscript-docs.filterScope", filterScope));
+    /** @type {(cmd:string, cb:()=>any) => void} */
+    const subscribe = (cmd, cb) => {
+        context.subscriptions.push(vscode.commands.registerCommand(cmdPrefix + cmd, () => (lastCommand = cmd, cb())));
+    };
+
+    subscribe("generateDocs", () => generate({ clear: true }));
+    subscribe("clean", () => generate({ clean: true }));
+    subscribe("update", () => generate({ update: true }));
+    subscribe("selectCommand", selectCommand);
+    subscribe("filterLanguage", () => selectFilter("files/json/*", "Pick Language").then(s => s && (languageFilter = s)));
+    subscribe("filterVersion", () => selectFilter("files/json/*/*", "Pick Version").then(s => s && (versionFilter = s)));
+    subscribe("filterScope", () => selectFilter("files/json/*/*/*", "Pick Scope").then(s => s && (scopeFilter = s)));
 
     vscode.languages.registerCompletionItemProvider('javascript', {
         provideCompletionItems
@@ -130,20 +97,20 @@ function deactivate() {
     webViewPanel.dispose();
 }
 
-function cleanDocs() { generate({ clean: true }) }
-function generateDocs() { generate({ clear: true }) }
-function updateDocs() { generate({ update: true }) }
-
 const generateOptions = { clean: false, clear: false, update: false };
 /** @param {Partial<typeof generateOptions>} [options] */
 function generate(options = generateOptions) {
     options = Object.assign(generateOptions, options);
 
-    generateBtn.text = "$(sync) Generating docs...";
-    generateBtn.tooltip = "Generating docs...";
+    working = true;
+    generateBtn.text = "$(sync~spin) Docs";
+    generateBtn.tooltip = "Task: " + cmdMap[lastCommand];
+
+    chn.clear();
+    chn.show();
 
     // Execute the Docs/files/jsdoc-parser.js file
-    exec(`node ${jsdocParserFilePath}`, (error, stdout, stderr) => {
+    processHandler(exec(`node ${jsdocParserFilePath}`, (error, stdout, stderr) => {
         if (error) return console.log(`Error: ${error.message}`);
         let optionStr = "";
         const filters = [languageFilter, scopeFilter];
@@ -151,68 +118,53 @@ function generate(options = generateOptions) {
         if (options.clean) optionStr += " -C";
         if (options.clear) optionStr += " -c";
         if (options.update) optionStr += " -u";
-        if (versionFilter != "*") optionStr += ` -V=${versionFilter}`;
+        if (versionFilter != "*") optionStr += ` -v=${versionFilter}`;
 
         // Execute the Docs/files/generate.js file
-        exec(`node ${generateJSFilePath}${optionStr} ${filter}`, (error, stdout, stderr) => {
+        processHandler(exec(`node ${generateJSFilePath}${optionStr} ${filter}`, (error, stdout, stderr) => {
             if (error) return console.error(`Error: ${error.message}`);
+            working = false;
+            generateBtn.text = "$(check) Docs: Done";
+            if ("generateDocs,update,".includes(lastCommand + ",")) openWithLiveServer();
+        }));
+    }));
+}
 
-            generateBtn.text = "$(check) Generate successful";
-            generateBtn.tooltip = "Generate successful";
-
-            // console.log(`stdout: ${stdout}`);
-            // console.error(`stderr: ${stderr}`);
-
-            openWithLiveServer();
-        });
-    });
+/** @param {ChildProcess} cp */
+function processHandler(cp) {
+    cp.stdout?.on("data", data => chn.append(data.replace(/\x1b\[[0-9;]*[a-z]/gi, '')))
+    cp.stderr?.on("data", data => chn.append(data.replace(/\x1b\[[0-9;]*[a-z]/gi, '')))
 }
 
 /** @param {string} name */
 const hidden = (name) => /^[~.]/.test(name[0]);
 
-async function filterLanguage() {
-    const languagePath = path.join(folderPath, "files", "json", "*");
-    const dirs = glob.sync(languagePath, { windowsPathsNoEscape: true, withFileTypes: true });
-    const langs = dirs.filter(d => d.isDirectory() && !hidden(d.name)).map(d => d.name);
-    langs.push("*");
-    const selection = await vscode.window.showQuickPick(langs, {
-        canPickMany: false,
-        title: "Pick Language Filter",
-        placeHolder: "* (all)"
+/** @type {(path:string, title:string) => Promise<string | undefined>} */
+async function selectFilter(pathGlob, title) {
+    const globPath = path.join(folderPath, ...pathGlob.split("/"));
+    const dirs = glob.sync(globPath, { windowsPathsNoEscape: true, withFileTypes: true });
+    const items = dirs.filter(d => d.isDirectory() && !hidden(d.name)).map(d => d.name);
+    items.push("*");
+    return await vscode.window.showQuickPick(items, {
+        canPickMany: false, title, placeHolder: "* (all)"
     });
-    if (selection) languageFilter = selection;
 }
 
-async function filterVersion() {
-    const versionPath = path.join(folderPath, "files", "json", "*", "*");
-    const dirs = glob.sync(versionPath, { windowsPathsNoEscape: true, withFileTypes: true });
-    const versions = dirs.filter(d => d.isDirectory() && !hidden(d.name)).map(d => d.name);
-    versions.push("*");
-    const selection = await vscode.window.showQuickPick(versions, {
-        canPickMany: false,
-        title: "Pick Version Filter",
-        placeHolder: "* (all)"
+async function selectCommand() {
+    const items = commands.map(c => cmdMap[c]);
+    const title = await vscode.window.showQuickPick(items, {
+        canPickMany: false, title: "Select Command", placeHolder: "Generate"
     });
-    if (selection) versionFilter = selection;
-}
-
-async function filterScope() {
-    const scopePath = path.join(folderPath, "files", "json", "*", "*", "*");
-    const dirs = glob.sync(scopePath, { windowsPathsNoEscape: true, withFileTypes: true });
-    const scopes = dirs.filter(d => d.isDirectory() && !hidden(d.name)).map(d => d.name);
-    scopes.push("*");
-    const selection = await vscode.window.showQuickPick(scopes, {
-        canPickMany: false,
-        title: "Pick Scope Filter",
-        placeHolder: "* (all)"
-    });
-    if (selection) scopeFilter = selection;
+    const cmd = pkg.contributes.commands.find(c => c.title == titlePrefix + title);
+    if (!cmd) return;
+    await vscode.commands.executeCommand(cmd.command);
 }
 
 async function openWithLiveServer() {
     if (serverIsRunning) return;
-    const fileUri = vscode.Uri.file(path.join(folderPath, "out", "docs", "Docs.htm"));
+    const docsPath = path.join(folderPath, "out", "docs", "Docs.htm");
+    if (!fs.existsSync(docsPath)) return;
+    const fileUri = vscode.Uri.file(docsPath);
     const document = await vscode.workspace.openTextDocument(fileUri);
     await vscode.window.showTextDocument(document);
     await vscode.commands.executeCommand('extension.liveServer.goOnline');
