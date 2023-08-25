@@ -4,12 +4,15 @@ const { exec } = require("child_process");
 const path = require("path");
 
 let folderPath = "";
-let generateJSFilePath = "";
-let jsdocParserFilePath = "";
-let generateBtn = null;
-let webViewPanel = null;
+let generateJSFilePath = "files/generate.js";
+let jsdocParserFilePath = "files/jsdoc-parser.js";
+/** @type {vscode.StatusBarItem} */
+let generateBtn;
+/** @type {vscode.WebviewPanel} */
+let webViewPanel;
 let serverIsRunning = false;
 
+/** @type {{[x:string]:string}} */
 const tnames = {
     "all": "all types",
     "bin": "Boolean",
@@ -81,18 +84,18 @@ const tnames = {
     "str_url": "url path"
 };
 
-function activate( context ) {
-
+/** @param {vscode.ExtensionContext} context */
+function activate(context) {
+    if (!vscode.workspace.workspaceFolders) return;
     const cw = vscode.workspace.workspaceFolders[0];
-
-    if(!cw || !cw.name) return;
+    if (!cw || !cw.name) return;
 
     folderPath = cw.uri.fsPath;
-    generateJSFilePath = path.join(folderPath, "files", "generate.js");
-    jsdocParserFilePath = path.join(folderPath, "files", "jsdoc-parser.js");
+    generateJSFilePath = path.join(folderPath, generateJSFilePath);
+    jsdocParserFilePath = path.join(folderPath, jsdocParserFilePath);
 
-    if( !fs.existsSync(generateJSFilePath) ) return;
-    if( !fs.existsSync(jsdocParserFilePath) ) return;
+    if (!fs.existsSync(generateJSFilePath)) return;
+    if (!fs.existsSync(jsdocParserFilePath)) return;
 
     generateBtn = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
     generateBtn.command = "droidscript-docs.generateDocs";
@@ -100,7 +103,7 @@ function activate( context ) {
     generateBtn.tooltip = "DroidScript Docs: Generate";
     generateBtn.show();
 
-    vscode.workspace.onDidChangeTextDocument( event => {
+    vscode.workspace.onDidChangeTextDocument(event => {
         // Handle the event, for example, update the status bar icon
         generateBtn.text = "$(tools) Generate Docs";
         generateBtn.tooltip = "DroidScript Docs: Generate";
@@ -120,17 +123,17 @@ function deactivate() {
 }
 
 function generateDocs() {
-    
+
     generateBtn.text = "$(sync) Generating docs...";
     generateBtn.tooltip = "Generating docs...";
 
     // Execute the Docs/files/jsdoc-parser.js file
     exec(`node ${jsdocParserFilePath}`, (error, stdout, stderr) => {
-        if( error ) return console.log(`Error: ${error.message}`);
+        if (error) return console.log(`Error: ${error.message}`);
 
         // Execute the Docs/files/generate.js file
         exec(`node ${generateJSFilePath}`, (error, stdout, stderr) => {
-            if( error ) return console.error(`Error: ${error.message}`);
+            if (error) return console.error(`Error: ${error.message}`);
 
             generateBtn.text = "$(check) Generate successfull";
             generateBtn.tooltip = "Generate successfull";
@@ -144,8 +147,8 @@ function generateDocs() {
 }
 
 async function openWithLiveServer() {
-    if( serverIsRunning ) return;
-    const fileUri = vscode.Uri.file( path.join(folderPath, "out", "docs", "Docs.htm") );
+    if (serverIsRunning) return;
+    const fileUri = vscode.Uri.file(path.join(folderPath, "out", "docs", "Docs.htm"));
     const document = await vscode.workspace.openTextDocument(fileUri);
     await vscode.window.showTextDocument(document);
     await vscode.commands.executeCommand('extension.liveServer.goOnline');
@@ -153,31 +156,31 @@ async function openWithLiveServer() {
     // openDocs();
 }
 
-
+/** @type {vscode.CompletionItemProvider["provideCompletionItems"]} */
 function provideCompletionItems(doc, pos, token, context) {
     const ln = pos.line;
     const cd = doc.lineAt(ln).text;
 
-    if(!cd.includes("@param") && !cd.includes("@return")) return;
-    
+    if (!cd.includes("@param") && !cd.includes("@return")) return;
+
     const completionItems = Object.keys(tnames).map(m => {
         return new vscode.CompletionItem(m, vscode.CompletionItemKind.Property);
     });
 
     // Customize your completion items
     completionItems.forEach(item => {
-        let a = item.label;
+        let a = typeof item.label == "string" ? item.label : item.label.label;
         item.insertText = a;
         let b = a.includes("_") ? a.split("_")[0] : "";
         item.detail = b ? tnames[b] + " : " + tnames[a] : tnames[a];
     });
-  
+
     // Add more completion items as needed
-  
+
     return completionItems;
 }
 
 module.exports = {
-	activate,
-	deactivate
+    activate,
+    deactivate
 }
