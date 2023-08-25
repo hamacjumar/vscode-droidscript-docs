@@ -1,7 +1,9 @@
 const vscode = require("vscode");
 const fs = require("fs");
+const fsp = fs.promises;
 const { exec } = require("child_process");
 const path = require("path");
+const glob = require("glob");
 
 let folderPath = "";
 let generateJSFilePath = "files/generate.js";
@@ -11,6 +13,7 @@ let generateBtn;
 /** @type {vscode.WebviewPanel} */
 let webViewPanel;
 let serverIsRunning = false;
+let languageFilter = "", versionFilter = "", scopeFilter = "", nameFilter = "";
 
 /** @type {{[x:string]:string}} */
 const tnames = {
@@ -109,7 +112,12 @@ function activate(context) {
         generateBtn.tooltip = "DroidScript Docs: Generate";
     });
 
-	context.subscriptions.push(vscode.commands.registerCommand("droidscript-docs.generateDocs", generateDocs));
+    context.subscriptions.push(vscode.commands.registerCommand("droidscript-docs.generateDocs", generateDocs));
+    context.subscriptions.push(vscode.commands.registerCommand("droidscript-docs.clean", cleanDocs));
+    context.subscriptions.push(vscode.commands.registerCommand("droidscript-docs.update", updateDocs));
+    context.subscriptions.push(vscode.commands.registerCommand("droidscript-docs.filterLanguage", filterLanguage));
+    context.subscriptions.push(vscode.commands.registerCommand("droidscript-docs.filterVersion", filterVersion));
+    context.subscriptions.push(vscode.commands.registerCommand("droidscript-docs.filterScope", filterScope));
 
     vscode.languages.registerCompletionItemProvider('javascript', {
         provideCompletionItems
@@ -122,7 +130,14 @@ function deactivate() {
     webViewPanel.dispose();
 }
 
-function generateDocs() {
+function cleanDocs() { generate({ clean: true }) }
+function generateDocs() { generate({ clear: true }) }
+function updateDocs() { generate({ update: true }) }
+
+const generateOptions = { clean: false, clear: false, update: false };
+/** @param {Partial<typeof generateOptions>} [options] */
+function generate(options = generateOptions) {
+    options = Object.assign(generateOptions, options);
 
     generateBtn.text = "$(sync) Generating docs...";
     generateBtn.tooltip = "Generating docs...";
@@ -130,13 +145,20 @@ function generateDocs() {
     // Execute the Docs/files/jsdoc-parser.js file
     exec(`node ${jsdocParserFilePath}`, (error, stdout, stderr) => {
         if (error) return console.log(`Error: ${error.message}`);
+        let optionStr = "";
+        const filters = [languageFilter, scopeFilter];
+        const filter = filters.filter(f => f != "*").join(".");
+        if (options.clean) optionStr += " -C";
+        if (options.clear) optionStr += " -c";
+        if (options.update) optionStr += " -u";
+        if (versionFilter != "*") optionStr += ` -V=${versionFilter}`;
 
         // Execute the Docs/files/generate.js file
-        exec(`node ${generateJSFilePath}`, (error, stdout, stderr) => {
+        exec(`node ${generateJSFilePath}${optionStr} ${filter}`, (error, stdout, stderr) => {
             if (error) return console.error(`Error: ${error.message}`);
 
-            generateBtn.text = "$(check) Generate successfull";
-            generateBtn.tooltip = "Generate successfull";
+            generateBtn.text = "$(check) Generate successful";
+            generateBtn.tooltip = "Generate successful";
 
             // console.log(`stdout: ${stdout}`);
             // console.error(`stderr: ${stderr}`);
@@ -144,6 +166,48 @@ function generateDocs() {
             openWithLiveServer();
         });
     });
+}
+
+/** @param {string} name */
+const hidden = (name) => /^[~.]/.test(name[0]);
+
+async function filterLanguage() {
+    const languagePath = path.join(folderPath, "files", "json", "*");
+    const dirs = glob.sync(languagePath, { windowsPathsNoEscape: true, withFileTypes: true });
+    const langs = dirs.filter(d => d.isDirectory() && !hidden(d.name)).map(d => d.name);
+    langs.push("*");
+    const selection = await vscode.window.showQuickPick(langs, {
+        canPickMany: false,
+        title: "Pick Language Filter",
+        placeHolder: "* (all)"
+    });
+    if (selection) languageFilter = selection;
+}
+
+async function filterVersion() {
+    const versionPath = path.join(folderPath, "files", "json", "*", "*");
+    const dirs = glob.sync(versionPath, { windowsPathsNoEscape: true, withFileTypes: true });
+    const versions = dirs.filter(d => d.isDirectory() && !hidden(d.name)).map(d => d.name);
+    versions.push("*");
+    const selection = await vscode.window.showQuickPick(versions, {
+        canPickMany: false,
+        title: "Pick Version Filter",
+        placeHolder: "* (all)"
+    });
+    if (selection) versionFilter = selection;
+}
+
+async function filterScope() {
+    const scopePath = path.join(folderPath, "files", "json", "*", "*", "*");
+    const dirs = glob.sync(scopePath, { windowsPathsNoEscape: true, withFileTypes: true });
+    const scopes = dirs.filter(d => d.isDirectory() && !hidden(d.name)).map(d => d.name);
+    scopes.push("*");
+    const selection = await vscode.window.showQuickPick(scopes, {
+        canPickMany: false,
+        title: "Pick Scope Filter",
+        placeHolder: "* (all)"
+    });
+    if (selection) scopeFilter = selection;
 }
 
 async function openWithLiveServer() {
