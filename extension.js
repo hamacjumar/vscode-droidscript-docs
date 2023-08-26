@@ -17,6 +17,7 @@ const cmdMap = Object.assign({}, ...pkg.contributes.commands.map(c =>
 let folderPath = "";
 let generateJSFilePath = "files/generate.js";
 let jsdocParserFilePath = "files/jsdoc-parser.js";
+let updatePagesFilePath = "files/updatePages.js";
 let confPath = "files/conf.json";
 
 /** @type {vscode.StatusBarItem} */
@@ -43,6 +44,7 @@ function activate(context) {
     folderPath = cw.uri.fsPath;
     generateJSFilePath = path.join(folderPath, generateJSFilePath);
     jsdocParserFilePath = path.join(folderPath, jsdocParserFilePath);
+    updatePagesFilePath = path.join(folderPath, updatePagesFilePath);
     confPath = path.join(folderPath, confPath);
 
     if (!fs.existsSync(generateJSFilePath)) return;
@@ -80,6 +82,7 @@ function activate(context) {
     subscribe("generateDocs", () => generate({ clear: true }));
     subscribe("clean", () => generate({ clean: true }));
     subscribe("update", () => generate({ update: true }));
+    subscribe("updatePages", updatePages);
     subscribe("addVariant", addVariant);
     subscribe("selectCommand", selectCommand);
     subscribe("allCommands", selectCommand.bind(null, true));
@@ -141,6 +144,17 @@ async function generate(options = generateOptions) {
     generateBtn.text = "$(check) Docs: Done";
     if ("generateDocs,update,".includes(lastCommand + ",")) openWithLiveServer();
     updateTooltip();
+}
+
+async function updatePages()
+{
+    // Execute the Docs/files/jsdoc-parser.js file
+    chn.appendLine(`node ${updatePagesFilePath}`);
+    try { await processHandler(exec(`node ${updatePagesFilePath}`)); }
+    catch (error) {
+        await vscode.window.showErrorMessage(`Error: ${error.message || error}`);
+        return updateTooltip();
+    }
 }
 
 /** 

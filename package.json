@@ -45,6 +45,10 @@
         "title": "DroidScript Docs: Update Docs Version"
       },
       {
+        "command": "droidscript-docs.updatePages",
+        "title": "DroidScript Docs: Update Github Pages"
+      },
+      {
         "command": "droidscript-docs.addVariant",
         "title": "DroidScript Docs: Add Docs Variant",
         "shortTitle": "DroidScript Docs: Add Docs Variant"
