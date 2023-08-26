@@ -100,7 +100,7 @@ function deactivate() {
 const generateOptions = { clean: false, clear: false, update: false, add: "", value: "", gen: true };
 /** @param {Partial<typeof generateOptions>} [options] */
 async function generate(options = generateOptions) {
-    options = Object.assign(generateOptions, options);
+    options = Object.assign({}, generateOptions, options);
 
     working = true;
     generateBtn.text = "$(sync~spin) Docs";
@@ -110,8 +110,6 @@ async function generate(options = generateOptions) {
     chn.show();
 
     if ("generateDocs,update,".includes(lastCommand + ",")) {
-        if (nameFilter != "*") vscode.commands.executeCommand('livePreview.end');
-
         // Execute the Docs/files/jsdoc-parser.js file
         chn.appendLine(`node ${jsdocParserFilePath}`);
         try { await processHandler(exec(`node ${jsdocParserFilePath}`)); }
@@ -119,6 +117,7 @@ async function generate(options = generateOptions) {
             await vscode.window.showErrorMessage(`Error: ${error.message || error}`);
             return updateTooltip();
         }
+        if (nameFilter == "*") vscode.commands.executeCommand('livePreview.end');
     }
 
     let optionStr = "";
