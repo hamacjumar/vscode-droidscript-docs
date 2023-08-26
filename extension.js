@@ -263,7 +263,6 @@ function getServerPath(lang, ver, scope, name) {
         if (files.length == 1) subPath.push(scopeName, path.basename(files[0]))
         else subPath.push("Docs.htm");
     }
-
     return path.join(folderPath, ...subPath);
 }
 
