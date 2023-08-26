@@ -17,6 +17,20 @@
   ],
   "main": "./extension.js",
   "contributes": {
+    "keybindings": [
+      {
+        "command": "droidscript-docs.generateDocs",
+        "key": "ctrl+alt+d",
+        "mac": "cmd+alt+d",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "droidscript-docs.selectCommand",
+        "key": "alt+d",
+        "mac": "alt+d",
+        "when": "editorTextFocus"
+      }
+    ],
     "commands": [
       {
         "command": "droidscript-docs.generateDocs",
@@ -31,20 +45,13 @@
         "title": "DroidScript Docs: Update Docs Version"
       },
       {
-        "command": "droidscript-docs.filterLanguage",
-        "title": "DroidScript Docs: Language Filter"
+        "command": "droidscript-docs.addVariant",
+        "title": "DroidScript Docs: Add Docs Variant",
+        "shortTitle": "DroidScript Docs: Add Docs Variant"
       },
       {
-        "command": "droidscript-docs.filterVersion",
-        "title": "DroidScript Docs: Version Filter"
-      },
-      {
-        "command": "droidscript-docs.filterScope",
-        "title": "DroidScript Docs: Scope Filter"
-      },
-      {
-        "command": "droidscript-docs.filterName",
-        "title": "DroidScript Docs: Name Filter"
+        "command": "droidscript-docs.filter",
+        "title": "DroidScript Docs: Apply Generator Filter"
       },
       {
         "command": "droidscript-docs.selectCommand",

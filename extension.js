@@ -80,12 +80,10 @@ function activate(context) {
     subscribe("generateDocs", () => generate({ clear: true }));
     subscribe("clean", () => generate({ clean: true }));
     subscribe("update", () => generate({ update: true }));
+    subscribe("addVariant", addVariant);
     subscribe("selectCommand", selectCommand);
     subscribe("allCommands", selectCommand.bind(null, true));
-    subscribe("filterLanguage", () => selectFilter(conf.langs, "Pick Language", languageFilter).then(s => s && (languageFilter = s)));
-    subscribe("filterVersion", () => selectFilter(conf.vers, "Pick Version", versionFilter).then(s => s && (versionFilter = s)));
-    subscribe("filterScope", () => selectFilter(conf.scopes, "Pick Scope", scopeFilter).then(s => s && (scopeFilter = s)));
-    subscribe("filterName", enterNameFilter);
+    subscribe("filter", chooseFilter);
     subscribe("preview", openWithLiveServer);
 
     vscode.languages.registerCompletionItemProvider('javascript', { provideCompletionItems });
@@ -99,7 +97,7 @@ function deactivate() {
     vscode.commands.executeCommand('livePreview.end');
 }
 
-const generateOptions = { clean: false, clear: false, update: false };
+const generateOptions = { clean: false, clear: false, update: false, add: "", value: "", gen: true };
 /** @param {Partial<typeof generateOptions>} [options] */
 async function generate(options = generateOptions) {
     options = Object.assign(generateOptions, options);
@@ -110,13 +108,17 @@ async function generate(options = generateOptions) {
 
     chn.clear();
     chn.show();
-    if (nameFilter != "*") vscode.commands.executeCommand('livePreview.end');
 
-    // Execute the Docs/files/jsdoc-parser.js file
-    try { await processHandler(exec(`node ${jsdocParserFilePath}`)); }
-    catch (error) {
-        await vscode.window.showErrorMessage(`Error: ${error.message || error}`);
-        return updateTooltip();
+    if ("generateDocs,update,".includes(lastCommand + ",")) {
+        if (nameFilter != "*") vscode.commands.executeCommand('livePreview.end');
+
+        // Execute the Docs/files/jsdoc-parser.js file
+        chn.appendLine(`node ${jsdocParserFilePath}`);
+        try { await processHandler(exec(`node ${jsdocParserFilePath}`)); }
+        catch (error) {
+            await vscode.window.showErrorMessage(`Error: ${error.message || error}`);
+            return updateTooltip();
+        }
     }
 
     let optionStr = "";
@@ -124,9 +126,12 @@ async function generate(options = generateOptions) {
     const filter = filters.filter(f => f != "*").join(".");
     if (options.clean) optionStr += " -C";
     if (options.clear) optionStr += " -c";
+    if (!options.gen) optionStr += " -n";
     if (options.update) optionStr += " -u";
+    if (options.add) optionStr += ` -a${options.add}="${options.value}"`;
     if (versionFilter != "*") optionStr += ` -v=${versionFilter}`;
 
+    chn.appendLine(`$ node ${generateJSFilePath}${optionStr} ${filter}`);
     try { await processHandler(exec(`node ${generateJSFilePath}${optionStr} ${filter}`)); }
     catch (error) {
         await vscode.window.showErrorMessage(`Error: ${error.message || error}`);
@@ -148,14 +153,59 @@ function processHandler(cp) {
     cp.stderr?.on("data", data => chn.append(data.replace(/\x1b\[[0-9;]*[a-z]/gi, '')));
     let error = false;
     return new Promise((res, rej) => {
-        cp.on("error", e => (error = true, rej(e)));
-        cp.on("exit", code => error || res(code || 0));
+        cp.on("error", e => (error = true, chn.append("$ Error: " + e), rej(e)));
+        cp.on("exit", (code, sig) => (chn.append(`$ Exit Code: ${code}` + (sig ? ` (${sig})` : '')), error || res(code || 0)));
     });
 }
 
 function updateTooltip() {
     const filter = `language: ${languageFilter}\nversion: ${versionFilter}\nscope: ${scopeFilter}\nname: ${nameFilter}`;
     generateBtn.tooltip = `Generate Filter\n${filter}`;
+}
+
+async function addVariant() {
+    const ph = { Language: "en (English)", Version: "v257", Scope: "app (Reference)" };
+    /** @ts-ignore @type {keyof typeof ph | undefined} */
+    const variant = await vscode.window.showQuickPick(Object.keys(ph), { title: "Pick Variant" });
+    if (!variant) return;
+
+    /** @param {string} value */
+    const validateInput = (value) => {
+        const m = value.match(/^(\w*)(\s+\(?(.*)\)?)?$/);
+        if (!m) return "Invalid Input";
+        if (variant == "Language") {
+            if (!m[1] || !/^[a-z][a-z]$/.test(m[1])) return "Language code must have 2 lower case letters";
+            if (!m[3] || !/^\w{4,}$/.test(m[3])) return "Missing name after language code";
+        }
+        else if (variant == "Version") {
+            // supports alpha, beta and patch versions, although noone might ever use those
+            if (!m[1] || !/^v\d{3}([ab]\d(_p\d)?)?$/.test(m[1])) return "Version must start with a 'v' followed by 1-3 digits";
+        }
+        else if (variant == "Scope") {
+            if (!m[1] || !/^[a-z][a-z0-9]{2,}$/i.test(m[1])) return "Scope namespace must have at least 3 digits";
+            if (!m[3] || !/^.{4,}$/.test(m[3])) return "Missing title after scope namespace";
+        }
+        else return "How did you get in here?!";
+
+        return undefined;
+    }
+    let value = await vscode.window.showInputBox({ title: "Enter " + variant, value: ph[variant], validateInput });
+    if (!value) return;
+
+    value = value?.replace(/[\s()]+/g, " ").replace(" ", "=");
+    generate({ add: variant[0].toLowerCase(), value, gen: false });
+}
+
+async function chooseFilter() {
+    const items = ["Language", "Version", "Scope", "Name"];
+    /** @type {typeof items[number] | undefined} */
+    const type = await vscode.window.showQuickPick(items, { title: "Pick Filter Type" });
+
+    if (type == "Language") selectFilter(conf.langs, "Pick Language", languageFilter).then(s => s && (languageFilter = s));
+    else if (type == "Version") selectFilter(conf.vers, "Pick Version", versionFilter).then(s => s && (versionFilter = s));
+    else if (type == "Scope") selectFilter(conf.scopes, "Pick Scope", scopeFilter).then(s => s && (scopeFilter = s));
+    else if (type == "Name") enterNameFilter();
+    else if (type) await vscode.window.showWarningMessage("This is not okay, youre warned!");
 }
 
 /** @type {(list:string[]|Obj<string>, title:string, dflt?:string) => Promise<string | undefined>} */
@@ -165,9 +215,7 @@ async function selectFilter(list, title, dflt = "*") {
     items.push("* (all)");
 
     let placeHolder = items.find(s => s.includes(dflt)) || "all (*)";
-    const res = await vscode.window.showQuickPick(items, {
-        canPickMany: false, title, placeHolder
-    });
+    const res = await vscode.window.showQuickPick(items, { title, placeHolder });
     setTimeout(updateTooltip, 100);
     return res && res.split(' ')[0];
 }
@@ -175,7 +223,7 @@ async function selectFilter(list, title, dflt = "*") {
 async function selectCommand(all = false) {
     const items = all ? Object.values(cmdMap) : commands.map(c => cmdMap[c]);
     const title = await vscode.window.showQuickPick(items, {
-        canPickMany: false, title: "Select Command", placeHolder: "Generate"
+        title: "Select Command", placeHolder: "Generate"
     });
     const cmd = pkg.contributes.commands.find(c => c.title == titlePrefix + title);
     if (!cmd) return;
