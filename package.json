@@ -13,7 +13,7 @@
     "Other"
   ],
   "activationEvents": [
-    "onStartupFinished"
+    "workspaceContains:files/generate.js"
   ],
   "main": "./extension.js",
   "contributes": {
@@ -21,6 +21,42 @@
       {
         "command": "droidscript-docs.generateDocs",
         "title": "DroidScript Docs: Generate"
+      },
+      {
+        "command": "droidscript-docs.clean",
+        "title": "DroidScript Docs: Clean Temp Files"
+      },
+      {
+        "command": "droidscript-docs.update",
+        "title": "DroidScript Docs: Update Docs Version"
+      },
+      {
+        "command": "droidscript-docs.filterLanguage",
+        "title": "DroidScript Docs: Language Filter"
+      },
+      {
+        "command": "droidscript-docs.filterVersion",
+        "title": "DroidScript Docs: Version Filter"
+      },
+      {
+        "command": "droidscript-docs.filterScope",
+        "title": "DroidScript Docs: Scope Filter"
+      },
+      {
+        "command": "droidscript-docs.filterName",
+        "title": "DroidScript Docs: Name Filter"
+      },
+      {
+        "command": "droidscript-docs.selectCommand",
+        "title": "DroidScript Docs: Select Command"
+      },
+      {
+        "command": "droidscript-docs.allCommands",
+        "title": "DroidScript Docs: All Commands"
+      },
+      {
+        "command": "droidscript-docs.preview",
+        "title": "DroidScript Docs: Open Preview"
       }
     ]
   },
@@ -29,6 +65,12 @@
     "pretest": "npm run lint",
     "test": "node ./test/runTest.js"
   },
+  "extensionDependencies": [
+    "ms-vscode.live-server"
+  ],
+  "dependencies": {
+    "glob": "^10.3.3"
+  },
   "devDependencies": {
     "@types/glob": "^8.1.0",
     "@types/mocha": "^10.0.1",
@@ -36,7 +78,6 @@
     "@types/vscode": "^1.54.0",
     "@vscode/test-electron": "^2.3.0",
     "eslint": "^8.36.0",
-    "glob": "^8.1.0",
     "mocha": "^10.2.0",
     "typescript": "^4.9.5"
   }

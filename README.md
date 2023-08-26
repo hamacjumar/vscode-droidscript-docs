@@ -22,7 +22,7 @@ Examples:
 | **`str_col`** | String: hexadecimal: `“#rrggbb”`, `“#aarrggbb”` colourName: `“red”`, `“green”`, ... |
 | **`str_com`** | String: comma `“,”` separated: |
 
-Memorizing these custom data types is not practical so the extension offered word suggestions for them with their description. See image below.
+Memorizing these custom data types is not practical so the extension offers word suggestions for them with their description. See image below.
 
 ![Custom Data Types](./img/screenshot-2.png)
 
@@ -30,14 +30,13 @@ Memorizing these custom data types is not practical so the extension offered wor
 ### How to generate
 - Click the **"Generate Docs"** button item in the status bar.
 
-> After the docs is generated, the rendered docs will be open in the browser. You can then open VS Code and browser side by side.
+> After the generation, the rendered docs will be opened in a new live-server panel on the right.
 
 
-If you are satisfied with the result of your changes to the Docs, you can then commit and push your changes to your copy of the repo and then send a **Pull Request** to DroidScript Docs.
+If you are satisfied with the result of your changes to the Docs, you can commit and push your changes to your copy of the repo and then send a **Pull Request** to DroidScript Docs.
 
-
-### Requirements
-- You need to have **[Live Server](https://marketplace.visualstudio.com/items?itemName=ritwickdey.LiveServer)** extension by _Ritwick Dey_ installed.
-
-#### Author
+#### Authors
 - **GineersLife:** Jumar Hamac - *hamacjumar@gmail.com*
+
+#### Contributors:
+- **Symbroson:** - alex-Symbroson@gmail.com
