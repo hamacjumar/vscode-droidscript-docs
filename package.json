@@ -17,10 +17,36 @@
   ],
   "main": "./extension.js",
   "contributes": {
+    "keybindings": [
+      {
+        "command": "droidscript-docs.generateDocs",
+        "key": "ctrl+alt+d",
+        "mac": "cmd+alt+d",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "droidscript-docs.selectCommand",
+        "key": "alt+d",
+        "mac": "alt+d",
+        "when": "editorTextFocus"
+      }
+    ],
     "commands": [
       {
         "command": "droidscript-docs.generateDocs",
         "title": "DroidScript Docs: Generate"
+      },
+      {
+        "command": "droidscript-docs.preview",
+        "title": "DroidScript Docs: Open Preview"
+      },
+      {
+        "command": "droidscript-docs.updatePages",
+        "title": "DroidScript Docs: Update Github Pages"
+      },
+      {
+        "command": "droidscript-docs.filter",
+        "title": "DroidScript Docs: Apply Generator Filter"
       },
       {
         "command": "droidscript-docs.clean",
@@ -31,20 +57,13 @@
         "title": "DroidScript Docs: Update Docs Version"
       },
       {
-        "command": "droidscript-docs.filterLanguage",
-        "title": "DroidScript Docs: Language Filter"
+        "command": "droidscript-docs.addVariant",
+        "title": "DroidScript Docs: Add Docs Variant",
+        "shortTitle": "DroidScript Docs: Add Docs Variant"
       },
       {
-        "command": "droidscript-docs.filterVersion",
-        "title": "DroidScript Docs: Version Filter"
-      },
-      {
-        "command": "droidscript-docs.filterScope",
-        "title": "DroidScript Docs: Scope Filter"
-      },
-      {
-        "command": "droidscript-docs.filterName",
-        "title": "DroidScript Docs: Name Filter"
+        "command": "droidscript-docs.markdownGen",
+        "title": "DroidScript Docs: Generate Markdown from JSON"
       },
       {
         "command": "droidscript-docs.selectCommand",
@@ -53,10 +72,6 @@
       {
         "command": "droidscript-docs.allCommands",
         "title": "DroidScript Docs: All Commands"
-      },
-      {
-        "command": "droidscript-docs.preview",
-        "title": "DroidScript Docs: Open Preview"
       }
     ]
   },

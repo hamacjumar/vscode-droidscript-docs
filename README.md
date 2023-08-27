@@ -4,6 +4,10 @@ An extension to edit and view DroidScript Docs.
 
 ![DroidScript Docs](./img/screenshot-main.png)
 
+### Shortcuts:
+- `alt+d` - Show & Select Command List
+- `ctrl+alt+d` - Generate Docs
+
 ### How to start editing
 1. Login to your GitHub account and fork the [DroidScript Docs](https://github.com/DroidScript/Docs) repository on Github.
 2. Clone the forked repository in your local machine for you to edit the Docs locally using VS Code.
