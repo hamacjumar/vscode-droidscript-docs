@@ -8,7 +8,9 @@ const pkg = require("./package.json");
 
 const cmdPrefix = "droidscript-docs.";
 const titlePrefix = "DroidScript Docs: ";
-const commands = ["generateDocs", "clean", "update", "allCommands"];
+// default displayed commands
+const commands = ["generateDocs", "preview", "updatePages", "filter", "allCommands"];
+
 /** @type {CmdMap} */
 const cmdMap = Object.assign({}, ...pkg.contributes.commands.map(c =>
     ({ [c.command.replace(cmdPrefix, "")]: c.title.replace(titlePrefix, "") })
@@ -18,6 +20,7 @@ let folderPath = "";
 let generateJSFilePath = "files/generate.js";
 let jsdocParserFilePath = "files/jsdoc-parser.js";
 let updatePagesFilePath = "files/updatePages.js";
+let markdownGenFilePath = "files/markdown-generator.js";
 let confPath = "files/conf.json";
 
 /** @type {vscode.StatusBarItem} */
@@ -45,6 +48,7 @@ function activate(context) {
     generateJSFilePath = path.join(folderPath, generateJSFilePath);
     jsdocParserFilePath = path.join(folderPath, jsdocParserFilePath);
     updatePagesFilePath = path.join(folderPath, updatePagesFilePath);
+    markdownGenFilePath = path.join(folderPath, markdownGenFilePath);
     confPath = path.join(folderPath, confPath);
 
     if (!fs.existsSync(generateJSFilePath)) return;
@@ -82,7 +86,8 @@ function activate(context) {
     subscribe("generateDocs", () => generate({ clear: true }));
     subscribe("clean", () => generate({ clean: true }));
     subscribe("update", () => generate({ update: true }));
-    subscribe("updatePages", updatePages);
+    subscribe("updatePages", () => execFile(updatePagesFilePath));
+    subscribe("markdownGen", () => execFile(markdownGenFilePath));
     subscribe("addVariant", addVariant);
     subscribe("selectCommand", selectCommand);
     subscribe("allCommands", selectCommand.bind(null, true));
@@ -113,13 +118,7 @@ async function generate(options = generateOptions) {
     chn.show();
 
     if ("generateDocs,update,".includes(lastCommand + ",")) {
-        // Execute the Docs/files/jsdoc-parser.js file
-        chn.appendLine(`node ${jsdocParserFilePath}`);
-        try { await processHandler(exec(`node ${jsdocParserFilePath}`)); }
-        catch (error) {
-            await vscode.window.showErrorMessage(`Error: ${error.message || error}`);
-            return updateTooltip();
-        }
+        if (await execFile(jsdocParserFilePath)) return;
         if (nameFilter == "*") vscode.commands.executeCommand('livePreview.end');
     }
 
@@ -133,12 +132,7 @@ async function generate(options = generateOptions) {
     if (options.add) optionStr += ` -a${options.add}="${options.value}"`;
     if (versionFilter != "*") optionStr += ` -v=${versionFilter}`;
 
-    chn.appendLine(`$ node ${generateJSFilePath}${optionStr} ${filter}`);
-    try { await processHandler(exec(`node ${generateJSFilePath}${optionStr} ${filter}`)); }
-    catch (error) {
-        await vscode.window.showErrorMessage(`Error: ${error.message || error}`);
-        return updateTooltip();
-    }
+    await execFile(generateJSFilePath, optionStr + ' ' + filter);
 
     working = false;
     generateBtn.text = "$(check) Docs: Done";
@@ -146,21 +140,19 @@ async function generate(options = generateOptions) {
     updateTooltip();
 }
 
-async function updatePages()
-{
+/** @type {(file:string, args?:string) => Promise<number>} */
+async function execFile(file, args = "") {
     // Execute the Docs/files/jsdoc-parser.js file
-    chn.appendLine(`node ${updatePagesFilePath}`);
-    try { await processHandler(exec(`node ${updatePagesFilePath}`)); }
+    chn.appendLine(`$ node ${file} ${args}`);
+    try { return await processHandler(exec(`node ${file} ${args}`)); }
     catch (error) {
         await vscode.window.showErrorMessage(`Error: ${error.message || error}`);
-        return updateTooltip();
+        updateTooltip();
+        return -1;
     }
 }
 
-/** 
- * @param {ChildProcess} cp 
- * @returns {Promise<number>} 
- */
+/** @type {(cp:ChildProcess) => Promise<number>} */
 function processHandler(cp) {
     cp.stdout?.on("data", data => chn.append(data.replace(/\x1b\[[0-9;]*[a-z]/gi, '')));
     cp.stderr?.on("data", data => chn.append(data.replace(/\x1b\[[0-9;]*[a-z]/gi, '')));
@@ -234,8 +226,8 @@ async function selectFilter(list, title, dflt = "*") {
 }
 
 async function selectCommand(all = false) {
-    const items = all ? Object.values(cmdMap) : commands.map(c => cmdMap[c]);
-    const title = await vscode.window.showQuickPick(items, {
+    const items = !all ? commands : Object.keys(cmdMap).filter(c => !"selectCommand,allCommands".includes(c));
+    const title = await vscode.window.showQuickPick(items.map(c => cmdMap[c]), {
         title: "Select Command", placeHolder: "Generate"
     });
     const cmd = pkg.contributes.commands.find(c => c.title == titlePrefix + title);
