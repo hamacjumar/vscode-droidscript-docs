@@ -2,7 +2,24 @@
 
 All notable releases to the **"droidscript-docs"**.
 
-### Version 0.1.3
+### Verion 0.1.5 - August 27, 2023
+By Symbroson
+- add variant, single filter command
+- minor fix
+- updatePages command
+- markdownGen command, command order
+
+
+### Version 0.1.4 - August 26, 2023
+By Symbroson
+- formatting + types
+- generate.js filters & options
+- livePreview
+- md completion support
+- Filter Name & Open Preview
+- all commands
+
+### Version 0.1.3 - August 24, 2023
 - Added autocompletion for data types use by DroidScript Docs.
 - Change the path of the `out` folder from `Docs/files/out/` to `Docs/files/out`.
 

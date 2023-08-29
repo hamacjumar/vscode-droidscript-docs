@@ -3,7 +3,7 @@
   "displayName": "DroidScript Docs",
   "description": "Edit and view droidscript documentation",
   "publisher": "droidscript",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "repository": "https://github.com/hamacjumar/vscode-droidscript-docs.git",
   "icon": "./img/logo.png",
   "engines": {
@@ -70,10 +70,30 @@
         "title": "DroidScript Docs: Select Command"
       },
       {
+        "command": "droidscript-docs.generateFile",
+        "title": "Generate Docs from File"
+      },
+      {
         "command": "droidscript-docs.allCommands",
         "title": "DroidScript Docs: All Commands"
       }
-    ]
+    ],
+    "menus": {
+        "explorer/context": [
+            {
+                "command": "droidscript-docs.generateFile",
+                "when": "resourceLangId == javascript || resourceLangId == markdown",
+                "group": "navigation"
+            }
+        ],
+        "editor/title/context": [
+            {
+                "command": "droidscript-docs.generateFile",
+                "when": "resourceLangId == javascript || resourceLangId == markdown",
+                "group": "navigation"
+            }
+        ]
+    }
   },
   "scripts": {
     "lint": "eslint .",

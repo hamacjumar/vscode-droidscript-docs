@@ -72,15 +72,9 @@ function activate(context) {
     generateBtn.tooltip = "Select Command";
     generateBtn.show();
 
-    vscode.workspace.onDidChangeTextDocument(event => {
-        // Handle the event, for example, update the status bar icon
-        //generateBtn.text = "$(tools) Generate Docs";
-        //generateBtn.tooltip = cmdMap.generateDocs;
-    });
-
     /** @type {(cmd:string, cb:()=>any) => void} */
     const subscribe = (cmd, cb) => {
-        context.subscriptions.push(vscode.commands.registerCommand(cmdPrefix + cmd, () => (lastCommand = cmd, cb())));
+        context.subscriptions.push(vscode.commands.registerCommand(cmdPrefix + cmd, (...args) => (lastCommand = cmd, cb(...args))));
     };
 
     subscribe("generateDocs", () => generate({ clear: true }));
@@ -93,6 +87,9 @@ function activate(context) {
     subscribe("allCommands", selectCommand.bind(null, true));
     subscribe("filter", chooseFilter);
     subscribe("preview", openWithLiveServer);
+    subscribe("generateFile", generateFile);
+
+    vscode.workspace.onDidSaveTextDocument(event => generateFile(event.uri));
 
     vscode.languages.registerCompletionItemProvider('javascript', { provideCompletionItems });
     vscode.languages.registerCompletionItemProvider('markdown', { provideCompletionItems });
@@ -123,7 +120,7 @@ async function generate(options = generateOptions) {
     }
 
     let optionStr = "";
-    const filters = [languageFilter, scopeFilter];
+    const filters = [languageFilter, scopeFilter, nameFilter];
     const filter = filters.filter(f => f != "*").join(".");
     if (options.clean) optionStr += " -C";
     if (options.clear) optionStr += " -c";
@@ -276,6 +273,20 @@ async function openWithLiveServer() {
     if (!fs.existsSync(docsPath)) return;
     const fileUri = vscode.Uri.file(docsPath);
     await vscode.commands.executeCommand('livePreview.start.preview.atFile', fileUri);
+}
+
+async function generateFile( uri ) {
+    const fp = uri.fsPath;
+    if( !fp.includes("Docs/files/markup/") ) return;
+    // lang/scope/member
+    let s = fp.split("Docs/files/markup/")[1];
+    let lsm = s.split("/");
+    if(lsm.length !== 3) return;
+    scopeFilter = lsm[1];
+    nameFilter = lsm[2].substring(0, lsm[2].indexOf("."));
+    await execFile(jsdocParserFilePath, "-p="+scopeFilter+"."+nameFilter);
+    nameFilter += "*";
+    generate({clear: true});
 }
 
 /** @type {vscode.CompletionItemProvider["provideCompletionItems"]} */
