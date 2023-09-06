@@ -30,6 +30,7 @@ let webViewPanel;
 
 let languageFilter = "*", versionFilter = "*", scopeFilter = "*", nameFilter = "*";
 let lastCommand = "", working = false;
+let LANG = "en";
 
 /** @type {DSConfig} */
 let conf;
@@ -89,10 +90,12 @@ function activate(context) {
     subscribe("preview", openWithLiveServer);
     subscribe("generateFile", generateFile);
 
-    vscode.workspace.onDidSaveTextDocument(event => generateFile(event.uri));
+    // vscode.workspace.onDidSaveTextDocument(event => generateFile(event.uri));
 
     vscode.languages.registerCompletionItemProvider('javascript', { provideCompletionItems });
     vscode.languages.registerCompletionItemProvider('markdown', { provideCompletionItems });
+
+    getAllMarkupFiles();
 }
 
 // This method is called when your extension is deactivated
@@ -100,6 +103,19 @@ function deactivate() {
     generateBtn.dispose();
     webViewPanel.dispose();
     vscode.commands.executeCommand('livePreview.end');
+}
+
+function getAllMarkupFiles() {
+    const p = path.join(folderPath, "files", "markup", LANG);
+    let fdrs = fs.readdirSync( p );
+    fdrs = fdrs.filter(m => {
+        let g = fs.statSync(path.join(p, m));
+        return g.isDirectory();
+    });
+    /** @type {Array<String>} */
+    const mkfls = [];
+    fdrs.forEach(m =>  mkfls.push(...fs.readdirSync(path.join(p, m))));
+    vscode.commands.executeCommand('setContext', 'droidscript-docs.markupfiles', mkfls);
 }
 
 const generateOptions = { clean: false, clear: false, update: false, add: "", value: "", gen: true };

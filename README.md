@@ -4,18 +4,18 @@ An extension to edit and view DroidScript Docs.
 
 ![DroidScript Docs](./img/screenshot-main.png)
 
-### Shortcuts:
+## Shortcuts:
 - `alt+d` - Show & Select Command List
 - `ctrl+alt+d` - Generate Docs
 
-### How to start editing
+## How to start editing
 1. Login to your GitHub account and fork the [DroidScript Docs](https://github.com/DroidScript/Docs) repository on Github.
 2. Clone the forked repository in your local machine for you to edit the Docs locally using VS Code.
 3. After cloning, open **Docs** in VS Code and this extension will automatically detect the folder as **DroidScript Docs** and append the **Generate Docs** button in the status bar of VS Code.
 
 ![Generate Docs Screenshot](./img/screenshot-1.png)
 
-### Parameter Data Type Completion
+## Parameter Data Type Completion
 DroidScript Docs has its own custom data types which you can see in the **js markup** files. Though it supports the common data types e.g. _`String`_, _`Number`_, _`Boolean`_, _`Object`_, _`Function`_, _`Array`_, etc., the custom docs data types has an addition description in it.
 
 Examples:
@@ -31,15 +31,30 @@ Memorizing these custom data types is not practical so the extension offers word
 ![Custom Data Types](./img/screenshot-2.png)
 
 
-### How to generate
-- Click the **"Generate Docs"** button item in the status bar.
+## How to generate?
 
-> After the generation, the rendered docs will be opened in a new live-server panel on the right.
+### Option 1 - Generate all scopes
+- Click the **`Generate Docs`** button item in the status bar and select the **`"Generate"`** option in the commands dropdown and select `"Open Docs Preview"` menu in the dropdown context menus.
+
+### Option 2 - Generate specific file
+**Right-Click** on any markup (`".js"`) file and markdown (`".md"`) file within the scopes in the `"markup/<LANG>"` folder.
+
+![Context menu](./img/screenshot-3.png)
+
+You can also **Right-Click** on the editor tab name.
+
+![Context menu](./img/screenshot-4.png)
+
+## Preview
+
+After the generation, the rendered docs will be opened in a new live-server panel on the right. If there is no live preview being shown, click the **`Generate Docs`** button item in the status bar and select `"Open Preview"` command in the commands dropdown.
+
+![Context menu](./img/screenshot-5.png)
 
 
 If you are satisfied with the result of your changes to the Docs, you can commit and push your changes to your copy of the repo and then send a **Pull Request** to DroidScript Docs.
 
-#### Authors
+### Authors
 - **GineersLife:** Jumar Hamac - *hamacjumar@gmail.com*
 
 #### Contributors:

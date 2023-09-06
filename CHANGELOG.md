@@ -2,7 +2,10 @@
 
 All notable releases to the **"droidscript-docs"**.
 
-### Verion 0.1.5 - August 27, 2023
+### Version 0.1.6 - September 6, 2023
+- Add `Open Docs Preview` context menu to explorer context and editor title context.
+
+### Version 0.1.5 - August 27, 2023
 By Symbroson
 - add variant, single filter command
 - minor fix
