@@ -51,8 +51,15 @@ After the generation, the rendered docs will be opened in a new live-server pane
 
 ![Context menu](./img/screenshot-5.png)
 
-
 If you are satisfied with the result of your changes to the Docs, you can commit and push your changes to your copy of the repo and then send a **Pull Request** to DroidScript Docs.
+
+## Live Preview Flickering Issue
+
+If you notice flickering on the live preview when you type on the editor or when you save a file, it is due to live preview extension settings that will auto update when there are changes in the editor files. You can turn it off in VS Code by going to
+
+**`"Settings > User > Extensions > Live Preview > Live Preview: Auto Refresh Preview"`**
+
+And then select **`"Never"`**.
 
 ### Authors
 - **GineersLife:** Jumar Hamac - *hamacjumar@gmail.com*
