@@ -109,14 +109,14 @@ async function readConf() {
 
 function getAllMarkupFiles() {
     const p = path.join(folderPath, "files", "markup", LANG);
-    let fdrs = fs.readdirSync( p );
+    let fdrs = fs.readdirSync(p);
     fdrs = fdrs.filter(m => {
         let g = fs.statSync(path.join(p, m));
         return g.isDirectory();
     });
     /** @type {Array<String>} */
     const mkfls = [];
-    fdrs.forEach(m =>  mkfls.push(...fs.readdirSync(path.join(p, m))));
+    fdrs.forEach(m => mkfls.push(...fs.readdirSync(path.join(p, m))));
     vscode.commands.executeCommand('setContext', 'droidscript-docs.markupfiles', mkfls);
 }
 
@@ -302,18 +302,19 @@ async function openWithLiveServer() {
     await vscode.commands.executeCommand('livePreview.start.preview.atFile', fileUri);
 }
 
-async function generateFile( uri ) {
+/** @param {vscode.Uri} uri */
+async function generateFile(uri) {
     const fp = uri.fsPath;
-    if( !fp.includes("Docs/files/markup/") ) return;
+    if (!fp.includes("Docs/files/markup/")) return;
     // lang/scope/member
     let s = fp.split("Docs/files/markup/")[1];
     let lsm = s.split("/");
-    if(lsm.length !== 3) return;
+    if (lsm.length !== 3) return;
     scopeFilter = lsm[1];
     nameFilter = lsm[2].substring(0, lsm[2].indexOf("."));
-    await execFile(jsdocParserFilePath, "-p="+scopeFilter+"."+nameFilter);
+    await execFile(jsdocParserFilePath, `-p=${scopeFilter}.${nameFilter}`);
     nameFilter += "*";
-    generate({clear: true});
+    generate({ clear: true });
 }
 
 /** @type {vscode.CompletionItemProvider["provideCompletionItems"]} */
