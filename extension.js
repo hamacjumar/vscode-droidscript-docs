@@ -55,17 +55,7 @@ function activate(context) {
     if (!fs.existsSync(generateJSFilePath)) return;
     if (!fs.existsSync(jsdocParserFilePath)) return;
     if (!fs.existsSync(confPath)) return;
-
-    fs.readFile(confPath, "utf8", async (err, data) => {
-        let error = "";
-        if (err) error = err.name + ": " + err.message;
-        else try {
-            conf = JSON.parse(data);
-            Object.assign(tnames, conf.tname, conf.tdesc);
-        }
-        catch (e) { error = "Reading conf.json: " + e.message; }
-        if (error) await vscode.window.showErrorMessage(error);
-    });
+    readConf();
 
     generateBtn = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
     generateBtn.command = cmdPrefix + "selectCommand";
@@ -73,9 +63,9 @@ function activate(context) {
     generateBtn.tooltip = "Select Command";
     generateBtn.show();
 
-    /** @type {(cmd:string, cb:()=>any) => void} */
+    /** @type {(cmd:string, cb:(...args:any[])=>any) => void} */
     const subscribe = (cmd, cb) => {
-        context.subscriptions.push(vscode.commands.registerCommand(cmdPrefix + cmd, (...args) => (lastCommand = cmd, cb(...args))));
+        context.subscriptions.push(vscode.commands.registerCommand(cmdPrefix + cmd, (...args) => (lastCommand = cmd, readConf(), cb(...args))));
     };
 
     subscribe("generateDocs", () => generate({ clear: true }));
@@ -84,6 +74,7 @@ function activate(context) {
     subscribe("updatePages", () => execFile(updatePagesFilePath));
     subscribe("markdownGen", () => execFile(markdownGenFilePath));
     subscribe("addVariant", addVariant);
+    subscribe("setVersion", setVersion);
     subscribe("selectCommand", selectCommand);
     subscribe("allCommands", selectCommand.bind(null, true));
     subscribe("filter", chooseFilter);
@@ -105,20 +96,31 @@ function deactivate() {
     vscode.commands.executeCommand('livePreview.end');
 }
 
+async function readConf() {
+    try {
+        const data = await fsp.readFile(confPath, "utf8");
+        conf = JSON.parse(data);
+        Object.assign(tnames, conf.tname, conf.tdesc);
+    }
+    catch (e) {
+        await vscode.window.showErrorMessage(e);
+    }
+}
+
 function getAllMarkupFiles() {
     const p = path.join(folderPath, "files", "markup", LANG);
-    let fdrs = fs.readdirSync( p );
+    let fdrs = fs.readdirSync(p);
     fdrs = fdrs.filter(m => {
         let g = fs.statSync(path.join(p, m));
         return g.isDirectory();
     });
     /** @type {Array<String>} */
     const mkfls = [];
-    fdrs.forEach(m =>  mkfls.push(...fs.readdirSync(path.join(p, m))));
+    fdrs.forEach(m => mkfls.push(...fs.readdirSync(path.join(p, m))));
     vscode.commands.executeCommand('setContext', 'droidscript-docs.markupfiles', mkfls);
 }
 
-const generateOptions = { clean: false, clear: false, update: false, add: "", value: "", gen: true };
+const generateOptions = { clean: false, clear: false, update: false, add: "", set: "", value: "", gen: true };
 /** @param {Partial<typeof generateOptions>} [options] */
 async function generate(options = generateOptions) {
     options = Object.assign({}, generateOptions, options);
@@ -143,6 +145,7 @@ async function generate(options = generateOptions) {
     if (!options.gen) optionStr += " -n";
     if (options.update) optionStr += " -u";
     if (options.add) optionStr += ` -a${options.add}="${options.value}"`;
+    if (options.set) optionStr += ` -s${options.set}="${options.value}"`;
     if (versionFilter != "*") optionStr += ` -v=${versionFilter}`;
 
     await execFile(generateJSFilePath, optionStr + ' ' + filter);
@@ -211,7 +214,15 @@ async function addVariant() {
     if (!value) return;
 
     value = value?.replace(/[\s()]+/g, " ").replace(" ", "=");
-    generate({ add: variant[0].toLowerCase(), value, gen: false });
+    await generate({ add: variant[0].toLowerCase(), value, gen: false });
+    readConf();
+}
+
+async function setVersion() {
+    const version = await vscode.window.showQuickPick(conf.vers, { title: "Pick Filter Type" });
+    if (!version) return;
+    await generate({ set: "v", value: version, gen: false });
+    readConf();
 }
 
 async function chooseFilter() {
@@ -291,18 +302,19 @@ async function openWithLiveServer() {
     await vscode.commands.executeCommand('livePreview.start.preview.atFile', fileUri);
 }
 
-async function generateFile( uri ) {
+/** @param {vscode.Uri} uri */
+async function generateFile(uri) {
     const fp = uri.fsPath;
-    if( !fp.includes("Docs/files/markup/") ) return;
+    if (!fp.includes("Docs/files/markup/")) return;
     // lang/scope/member
     let s = fp.split("Docs/files/markup/")[1];
     let lsm = s.split("/");
-    if(lsm.length !== 3) return;
+    if (lsm.length !== 3) return;
     scopeFilter = lsm[1];
     nameFilter = lsm[2].substring(0, lsm[2].indexOf("."));
-    await execFile(jsdocParserFilePath, "-p="+scopeFilter+"."+nameFilter);
+    await execFile(jsdocParserFilePath, `-p=${scopeFilter}.${nameFilter}`);
     nameFilter += "*";
-    generate({clear: true});
+    generate({ clear: true });
 }
 
 /** @type {vscode.CompletionItemProvider["provideCompletionItems"]} */

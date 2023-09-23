@@ -62,6 +62,10 @@
         "shortTitle": "DroidScript Docs: Add Docs Variant"
       },
       {
+        "command": "droidscript-docs.setVersion",
+        "title": "DroidScript Docs: Switch DS Version"
+      },
+      {
         "command": "droidscript-docs.markdownGen",
         "title": "DroidScript Docs: Generate Markdown from JSON"
       },

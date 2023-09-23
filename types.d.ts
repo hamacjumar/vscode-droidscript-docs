@@ -8,6 +8,7 @@ declare global {
     type DSConfig = {
         langs: Obj<string>;
         vers: string[];
+        version: string;
         scopes: Obj<string>;
         regHide: string;
         regControl: string;
