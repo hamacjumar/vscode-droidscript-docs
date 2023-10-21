@@ -132,9 +132,10 @@ async function generate(options = generateOptions) {
     chn.clear();
     chn.show();
 
-    if ("generateDocs,update,".includes(lastCommand + ",")) {
-        if (await execFile(jsdocParserFilePath)) return;
-        if (nameFilter == "*") vscode.commands.executeCommand('livePreview.end');
+    if ("generateDocs,generateFile,update,".includes(lastCommand + ",")) {
+        const args = nameFilter == "*" ? undefined : `-p=${scopeFilter}.${nameFilter}`;
+        if (await execFile(jsdocParserFilePath, args)) return;
+        vscode.commands.executeCommand('livePreview.end');
     }
 
     let optionStr = "";
@@ -148,11 +149,11 @@ async function generate(options = generateOptions) {
     if (options.set) optionStr += ` -s${options.set}="${options.value}"`;
     if (versionFilter != "*") optionStr += ` -v=${versionFilter}`;
 
-    await execFile(generateJSFilePath, optionStr + ' ' + filter);
+    await execFile(generateJSFilePath, `${optionStr} "${filter}"`);
 
     working = false;
     generateBtn.text = "$(check) Docs: Done";
-    if ("generateDocs,update,".includes(lastCommand + ",")) openWithLiveServer();
+    if ("generateDocs,generateFile,update,".includes(lastCommand + ",")) openWithLiveServer();
     updateTooltip();
 }
 
@@ -304,17 +305,19 @@ async function openWithLiveServer() {
 
 /** @param {vscode.Uri} uri */
 async function generateFile(uri) {
+    const curDoc = vscode.window.activeTextEditor?.document;
+    curDoc?.save();
+    if (!uri && curDoc?.uri) uri = curDoc.uri;
     const fp = uri.fsPath;
-    if (!fp.includes("Docs/files/markup/")) return;
+    const markupPath = path.normalize("Docs/files/markup/");
+    if (!fp.includes(markupPath)) return;
     // lang/scope/member
-    let s = fp.split("Docs/files/markup/")[1];
-    let lsm = s.split("/");
+    let s = fp.split(markupPath)[1];
+    let lsm = s.split(path.sep);
     if (lsm.length !== 3) return;
     scopeFilter = lsm[1];
     nameFilter = lsm[2].substring(0, lsm[2].indexOf("."));
-    await execFile(jsdocParserFilePath, `-p=${scopeFilter}.${nameFilter}`);
-    nameFilter += "*";
-    generate({ clear: true });
+    generate();
 }
 
 /** @type {vscode.CompletionItemProvider["provideCompletionItems"]} */

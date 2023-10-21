@@ -25,6 +25,12 @@
         "when": "editorTextFocus"
       },
       {
+        "command": "droidscript-docs.generateFile",
+        "key": "ctrl+alt+f",
+        "mac": "cmd+alt+f",
+        "when": "editorTextFocus"
+      },
+      {
         "command": "droidscript-docs.selectCommand",
         "key": "alt+d",
         "mac": "alt+d",
@@ -75,7 +81,7 @@
       },
       {
         "command": "droidscript-docs.generateFile",
-        "title": "Open Docs Preview"
+        "title": "Generate File"
       },
       {
         "command": "droidscript-docs.allCommands",
