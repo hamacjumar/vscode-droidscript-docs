@@ -28,7 +28,7 @@ let generateBtn;
 /** @type {vscode.WebviewPanel} */
 let webViewPanel;
 
-let languageFilter = "*", versionFilter = "*", scopeFilter = "*", nameFilter = "*";
+let filter = { lang: "*", ver: "*", scope: "*", name: "*" };
 let lastCommand = "", working = false;
 let LANG = "en";
 
@@ -120,10 +120,11 @@ function getAllMarkupFiles() {
     vscode.commands.executeCommand('setContext', 'droidscript-docs.markupfiles', mkfls);
 }
 
-const generateOptions = { clean: false, clear: false, update: false, add: "", set: "", value: "", gen: true };
+const generateOptions = { clean: false, clear: false, update: false, add: "", set: "", value: "", gen: true, filter: /** @type {Partial<typeof filter>} */ (filter) };
 /** @param {Partial<typeof generateOptions>} [options] */
 async function generate(options = generateOptions) {
     options = Object.assign({}, generateOptions, options);
+    let filter = Object.assign({ lang: "*", ver: "*", scope: "*", name: "*" }, options.filter);
 
     working = true;
     generateBtn.text = "$(sync~spin) Docs";
@@ -133,27 +134,27 @@ async function generate(options = generateOptions) {
     chn.show();
 
     if ("generateDocs,generateFile,update,".includes(lastCommand + ",")) {
-        const args = nameFilter == "*" ? undefined : `-p=${scopeFilter}.${nameFilter}`;
+        const args = filter.name == "*" ? undefined : `-p=${filter.scope}.${filter.name}`;
         if (await execFile(jsdocParserFilePath, args)) return;
         vscode.commands.executeCommand('livePreview.end');
     }
 
     let optionStr = "";
-    const filters = [languageFilter, scopeFilter, nameFilter];
-    const filter = filters.filter(f => f != "*").join(".");
+    const filters = [filter.lang, filter.scope, filter.name];
+    const filterStr = filters.filter(f => f != "*").join(".");
     if (options.clean) optionStr += " -C";
     if (options.clear) optionStr += " -c";
     if (!options.gen) optionStr += " -n";
     if (options.update) optionStr += " -u";
     if (options.add) optionStr += ` -a${options.add}="${options.value}"`;
     if (options.set) optionStr += ` -s${options.set}="${options.value}"`;
-    if (versionFilter != "*") optionStr += ` -v=${versionFilter}`;
+    if (filter.ver != "*") optionStr += ` -v=${filter.ver}`;
 
-    await execFile(generateJSFilePath, `${optionStr} "${filter}"`);
+    await execFile(generateJSFilePath, `${optionStr} "${filterStr}"`);
 
     working = false;
     generateBtn.text = "$(check) Docs: Done";
-    if ("generateDocs,generateFile,update,".includes(lastCommand + ",")) openWithLiveServer();
+    if ("generateDocs,generateFile,update,".includes(lastCommand + ",")) openWithLiveServer(filter);
     updateTooltip();
 }
 
@@ -181,8 +182,8 @@ function processHandler(cp) {
 }
 
 function updateTooltip() {
-    const filter = `language: ${languageFilter}\nversion: ${versionFilter}\nscope: ${scopeFilter}\nname: ${nameFilter}`;
-    generateBtn.tooltip = `Generate Filter\n${filter}`;
+    const filterStr = `language: ${filter.lang}\nversion: ${filter.ver}\nscope: ${filter.scope}\nname: ${filter.name}`;
+    generateBtn.tooltip = `Generate Filter\n${filterStr}`;
 }
 
 async function addVariant() {
@@ -227,14 +228,16 @@ async function setVersion() {
 }
 
 async function chooseFilter() {
-    const items = ["Language", "Version", "Scope", "Name"];
+    const items = ["Language: " + filter.lang, "Version: " + filter.ver, "Scope: " + filter.scope, "Name: " + filter.name, "Clear"];
     /** @type {typeof items[number] | undefined} */
-    const type = await vscode.window.showQuickPick(items, { title: "Pick Filter Type" });
+    const selection = await vscode.window.showQuickPick(items, { title: "Pick Filter Type" });
+    const type = selection?.split(":")[0];
 
-    if (type == "Language") selectFilter(conf.langs, "Pick Language", languageFilter).then(s => s && (languageFilter = s));
-    else if (type == "Version") selectFilter(conf.vers, "Pick Version", versionFilter).then(s => s && (versionFilter = s));
-    else if (type == "Scope") selectFilter(conf.scopes, "Pick Scope", scopeFilter).then(s => s && (scopeFilter = s));
+    if (type == "Language") selectFilter(conf.langs, "Pick Language", filter.lang).then(s => s && (filter.lang = s));
+    else if (type == "Version") selectFilter(conf.vers, "Pick Version", filter.ver).then(s => s && (filter.ver = s));
+    else if (type == "Scope") selectFilter(conf.scopes, "Pick Scope", filter.scope).then(s => s && (filter.scope = s));
     else if (type == "Name") enterNameFilter();
+    else if (type == "Clear") filter.lang = filter.ver = filter.scope = filter.name = "*";
     else if (type) await vscode.window.showWarningMessage("This is not okay, youre warned!");
 }
 
@@ -267,7 +270,7 @@ async function enterNameFilter() {
     if (!pattern) return;
 
     try {
-        nameFilter = RegExp(pattern).source;
+        filter.name = /^\*?$/.test(pattern) ? pattern : RegExp(pattern).source;
         updateTooltip();
     }
     catch (e) {
@@ -275,7 +278,7 @@ async function enterNameFilter() {
     }
 }
 
-function langDir(l = languageFilter) { return l == "*" || l == "en" ? "docs" : "docs-" + l; }
+function langDir(l = filter.lang) { return l == "*" || l == "en" ? "docs" : "docs-" + l; }
 
 /** @type {(lang:string, ver:string, scope:string, name:string) => string} */
 function getServerPath(lang, ver, scope, name) {
@@ -296,8 +299,8 @@ function getServerPath(lang, ver, scope, name) {
     return path.join(folderPath, ...subPath);
 }
 
-async function openWithLiveServer() {
-    const docsPath = getServerPath(languageFilter, versionFilter, scopeFilter, nameFilter);
+async function openWithLiveServer(sfilter = filter) {
+    const docsPath = getServerPath(sfilter.lang, sfilter.ver, sfilter.scope, sfilter.name);
     if (!fs.existsSync(docsPath)) return;
     const fileUri = vscode.Uri.file(docsPath);
     await vscode.commands.executeCommand('livePreview.start.preview.atFile', fileUri);
@@ -315,9 +318,7 @@ async function generateFile(uri) {
     let s = fp.split(markupPath)[1];
     let lsm = s.split(path.sep);
     if (lsm.length !== 3) return;
-    scopeFilter = lsm[1];
-    nameFilter = lsm[2].substring(0, lsm[2].indexOf("."));
-    generate();
+    generate({ filter: { scope: lsm[1], name: lsm[2].substring(0, lsm[2].indexOf(".")) } });
 }
 
 /** @type {vscode.CompletionItemProvider["provideCompletionItems"]} */
