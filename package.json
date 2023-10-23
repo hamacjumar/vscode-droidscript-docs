@@ -3,7 +3,7 @@
   "displayName": "DroidScript Docs",
   "description": "Edit and view droidscript documentation",
   "publisher": "droidscript",
-  "version": "0.1.6",
+  "version": "0.1.8",
   "repository": "https://github.com/hamacjumar/vscode-droidscript-docs.git",
   "icon": "./img/logo.png",
   "engines": {

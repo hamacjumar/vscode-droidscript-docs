@@ -2,6 +2,13 @@
 
 All notable releases to the **"droidscript-docs"**.
 
+### Version 0.1.8 - October 23, 2023
+- Fixed `Generate File` overriding the global filter. Now shows the whole preview when `Preview` command is selected.
+
+### Version 0.1.7 - October 21, 2023
+- Fixed `Generate File` command.
+- Rename `Open Docs Preview` in the context menu into `Generate File`.
+
 ### Version 0.1.6 - September 6, 2023
 - Add `Open Docs Preview` context menu to explorer context and editor title context.
 
