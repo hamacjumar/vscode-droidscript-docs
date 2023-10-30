@@ -1,0 +1,15 @@
+env: [commonjs, es6, node, mocha]
+
+parserOptions:
+  ecmaVersion: 12
+  ecmaFeatures: [jsx]
+  sourceType: module
+
+rules:
+  no-const-assign: warn
+  no-this-before-super: warn
+  no-undef: warn
+  no-unreachable: warn
+  no-unused-vars: warn
+  constructor-super: warn
+  valid-typeof: warn
