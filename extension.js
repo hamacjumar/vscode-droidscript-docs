@@ -93,8 +93,6 @@ function activate(context) {
     vscode.languages.registerCompletionItemProvider('markdown', { provideCompletionItems });
 
     getAllMarkupFiles();
-
-    setTimeout(() => uploadDocs({}), 1000);
 }
 
 // This method is called when your extension is deactivated
@@ -382,7 +380,7 @@ function getServerPath(lang, ver, scope, name) {
     const subPath = [docsPath];
 
     if (name == "*")
-        subPath.push(scope == "*" ? "Docs.htm" : conf.scopes[scope].replace(/\s/g, "") + ".htm");
+        subPath.push(scope == "*" ? "Docs.htm" : conf.scopes[scope].replace(/\s+/g, "") + ".htm");
     else {
         const globPath = path.join(folderPath, ...subPath, scope, '*' + name.replace(/\.\*/g, "*").replace(/\s+/g, '') + '*');
         const files = glob.sync(globPath, { windowsPathsNoEscape: true, nodir: true, });
