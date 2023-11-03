@@ -174,22 +174,24 @@ async function generate(options = generateOptions) {
 async function execFile(file, args = "") {
     // Execute the Docs/files/jsdoc-parser.js file
     chn.appendLine(`$ node ${file} ${args}`);
-    try { return await processHandler(cpm.exec(`node ${file} ${args}`)); }
-    catch (error) {
-        await vscode.window.showErrorMessage(`Error: ${error.message || error}`);
-        updateTooltip();
-        return -1;
-    }
+    return await processHandler(cpm.exec(`node ${file} ${args}`))
+        .then(() => 0, ([code, error]) => {
+            vscode.window.showErrorMessage(`Exit Code ${code}: ${error.message || error}`);
+            updateTooltip();
+            return -1;
+        });
 }
 
-/** @type {(cp:cpm.ChildProcess) => Promise<number>} */
+/** @type {(cp:cpm.ChildProcess) => Promise<[number, Error]>} */
 function processHandler(cp) {
     cp.stdout?.on("data", data => chn.append(data.replace(/\x1b\[[0-9;]*[a-z]/gi, '')));
     cp.stderr?.on("data", data => chn.append(data.replace(/\x1b\[[0-9;]*[a-z]/gi, '')));
-    let error = false;
+    /** @type {Error} */
+    let error;
     return new Promise((res, rej) => {
-        cp.on("error", e => (error = true, chn.append("$ Error: " + e), rej(e)));
-        cp.on("exit", (code, sig) => (chn.append(`$ Exit Code: ${code}` + (sig ? ` (${sig})` : '')), error || res(code || 0)));
+        cp.on("error", e => (error = e, chn.append("$ Error: " + e)));
+        cp.on("exit", (code, sig) => (chn.append(`$ Exit Code: ${code}` + (sig ? ` (${sig})` : '')), 
+            (error || code ? rej : res)([code || 0, error || "Process returned non-null exit code.\nCheck the debug log for details."])));
     });
 }
 
@@ -276,7 +278,10 @@ async function uploadDocs(sfilter = filter) {
         title: `Uploading docs`,
     }, async (progress, token) => {
 
-        const filter = Object.assign({ lang: Object.keys(conf.langs)[0], ver: conf.vers[0], scope: "*", name: "*" }, sfilter);
+        const filter = Object.assign({ lang: "*", ver: "*", scope: "*", name: "*" }, sfilter);
+        if (filter.lang == "*") filter.lang = Object.keys(conf.langs)[0];
+        if (filter.ver == "*") filter.ver = conf.vers[0];
+
         const cwd = path.join(folderPath, "out", "docs" + (filter.lang == 'en' ? '' : `-${filter.lang}`), filter.ver);
         // a+b: a/b,  a+*: a/*,  *+b: */b,  *+*: **
         const docsGlob = `${filter.scope}/${filter.name}`.replace('*/*', '**');
