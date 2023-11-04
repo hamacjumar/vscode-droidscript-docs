@@ -16,6 +16,11 @@ declare global {
         tdesc: Obj<string>;
     }
 
+    type DSExtConfig = {
+        PORT: string;
+        serverIP: string;
+    }
+
     type PkgCmds = typeof pkg.contributes.commands;
     type CmdMap = {[x in PkgCmds[number]["command"]]: PkgCmds[number]["title"]}
 }

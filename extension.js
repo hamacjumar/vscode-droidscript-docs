@@ -1,10 +1,12 @@
 const vscode = require("vscode");
 const fs = require("fs");
 const fsp = fs.promises;
-const { exec, ChildProcess } = require("child_process");
+const cpm = require("child_process");
 const path = require("path");
 const glob = require("glob");
 const pkg = require("./package.json");
+const util = require("./src/util");
+const CONSTANTS = require('./src/CONSTANTS');
 
 const cmdPrefix = "droidscript-docs.";
 const titlePrefix = "DroidScript Docs: ";
@@ -34,6 +36,8 @@ let LANG = "en";
 
 /** @type {DSConfig} */
 let conf;
+/** @type {DSExtConfig} */
+let dsconf;
 /** @type {Obj<string>} */
 let tnames = {};
 
@@ -74,6 +78,8 @@ function activate(context) {
     subscribe("updatePages", () => execFile(updatePagesFilePath));
     subscribe("markdownGen", () => execFile(markdownGenFilePath));
     subscribe("addVariant", addVariant);
+    subscribe("upload", uploadDocs);
+    subscribe("uploadFile", uploadFile);
     subscribe("setVersion", setVersion);
     subscribe("selectCommand", selectCommand);
     subscribe("allCommands", selectCommand.bind(null, true));
@@ -97,14 +103,20 @@ function deactivate() {
 }
 
 async function readConf() {
-    try {
-        const data = await fsp.readFile(confPath, "utf8");
-        conf = JSON.parse(data);
-        Object.assign(tnames, conf.tname, conf.tdesc);
-    }
-    catch (e) {
-        await vscode.window.showErrorMessage(e);
-    }
+    await util.loadJson(confPath)
+        .then(cfg => { conf = cfg;  Object.assign(tnames, conf.tname, conf.tdesc); })
+        .catch(e => { vscode.window.showErrorMessage(e); });
+}
+
+async function readDSConf() {
+    await util.loadJson(CONSTANTS.DSCONFIG)
+        .then(cfg => { dsconf = cfg; })
+        .catch(e => { vscode.window.showErrorMessage(e); });
+}
+
+async function saveDSConf() {
+    await util.saveJson(CONSTANTS.DSCONFIG, dsconf)
+        .catch(e => { vscode.window.showErrorMessage(e); });
 }
 
 function getAllMarkupFiles() {
@@ -162,22 +174,24 @@ async function generate(options = generateOptions) {
 async function execFile(file, args = "") {
     // Execute the Docs/files/jsdoc-parser.js file
     chn.appendLine(`$ node ${file} ${args}`);
-    try { return await processHandler(exec(`node ${file} ${args}`)); }
-    catch (error) {
-        await vscode.window.showErrorMessage(`Error: ${error.message || error}`);
-        updateTooltip();
-        return -1;
-    }
+    return await processHandler(cpm.exec(`node ${file} ${args}`))
+        .then(() => 0, ([code, error]) => {
+            vscode.window.showErrorMessage(`Exit Code ${code}: ${error.message || error}`);
+            updateTooltip();
+            return -1;
+        });
 }
 
-/** @type {(cp:ChildProcess) => Promise<number>} */
+/** @type {(cp:cpm.ChildProcess) => Promise<[number, Error]>} */
 function processHandler(cp) {
     cp.stdout?.on("data", data => chn.append(data.replace(/\x1b\[[0-9;]*[a-z]/gi, '')));
     cp.stderr?.on("data", data => chn.append(data.replace(/\x1b\[[0-9;]*[a-z]/gi, '')));
-    let error = false;
+    /** @type {Error} */
+    let error;
     return new Promise((res, rej) => {
-        cp.on("error", e => (error = true, chn.append("$ Error: " + e), rej(e)));
-        cp.on("exit", (code, sig) => (chn.append(`$ Exit Code: ${code}` + (sig ? ` (${sig})` : '')), error || res(code || 0)));
+        cp.on("error", e => (error = e, chn.append("$ Error: " + e)));
+        cp.on("exit", (code, sig) => (chn.append(`$ Exit Code: ${code}` + (sig ? ` (${sig})` : '')), 
+            (error || code ? rej : res)([code || 0, error || "Process returned non-null exit code.\nCheck the debug log for details."])));
     });
 }
 
@@ -217,6 +231,82 @@ async function addVariant() {
 
     value = value?.replace(/[\s()]+/g, " ").replace(" ", "=");
     await generate({ add: variant[0].toLowerCase(), value, gen: false });
+    readConf();
+}
+
+/** @param {vscode.Uri} uri */
+async function uploadFile(uri)
+{
+    const fileFilter = util.getFileFilter(uri);
+    if (fileFilter) uploadDocs(fileFilter);
+}
+
+async function enterServerIP()
+{
+    let serverIP = dsconf.serverIP;
+    dsconf.PORT ||= CONSTANTS.PORT;
+    if (serverIP && !dsconf.serverIP.includes(':'))
+        serverIP = `${dsconf.serverIP}:${dsconf.PORT}`;
+    const validPort = /^\d+$/.test(dsconf.PORT);
+
+    vscode.window.showInformationMessage("Enter DS Server IP");
+    let newIP = await vscode.window.showInputBox({
+            title: "Enter DS Server IP", 
+            value: serverIP || '',
+            placeHolder: '192.168.178.42:' + CONSTANTS.PORT,
+            validateInput: ip => {
+                if (util.isValidIPWithPort(ip)) return;
+                return util.isValidIP(ip) ? (validPort ? null : "Invalid IP") : "Missing Port";
+            }
+        });
+    
+    if (!newIP) { vscode.window.showErrorMessage("Server IP not updated!"); return; }
+    if (!util.isValidIPWithPort(newIP)) newIP += ":" + dsconf.PORT;
+    if (!util.isValidIPWithPort(newIP)) { vscode.window.showErrorMessage("Server IP not updated!"); return; }
+    dsconf.serverIP = newIP;
+    saveDSConf();
+    vscode.window.showInformationMessage("Server IP updated!");
+}
+
+/** @param {Partial<typeof filter>} sfilter */
+async function uploadDocs(sfilter = filter) {
+    await readDSConf();
+    if (!util.isValidIPWithPort(dsconf.serverIP)) { enterServerIP(); return; }
+    
+    await vscode.window.withProgress({
+        location: vscode.ProgressLocation.Notification,
+        title: `Uploading docs`,
+    }, async (progress, token) => {
+
+        const filter = Object.assign({ lang: "*", ver: "*", scope: "*", name: "*" }, sfilter);
+        if (filter.lang == "*") filter.lang = Object.keys(conf.langs)[0];
+        if (filter.ver == "*") filter.ver = conf.vers[0];
+
+        const cwd = path.join(folderPath, "out", "docs" + (filter.lang == 'en' ? '' : `-${filter.lang}`), filter.ver);
+        // a+b: a/b,  a+*: a/*,  *+b: */b,  *+*: **
+        const docsGlob = `${filter.scope}/${filter.name}`.replace('*/*', '**');
+        const files = await glob.glob(docsGlob, {cwd, posix: true, nodir: true});
+
+        // reverse() as glob is somewhat reverse sorted
+        await util.batchPromises(files.reverse(), async (file, index, data) => {
+            if (token.isCancellationRequested) throw new Error("Cancelled");
+            
+            const dest = '.edit/docs/' + file;
+            const folder = dest.slice(0, dest.lastIndexOf('/'));
+            const name = path.basename(file);
+
+            const fileStream = fs.createReadStream(path.join(cwd, file));
+            const res = await util.uploadFile(dsconf.serverIP, fileStream, folder, name);
+
+            if (res.status !== "ok") throw Error(JSON.stringify(res));
+            progress.report({increment: 100 / data.length, message: file});
+        })
+        .then(() => { vscode.window.showInformationMessage("Upload Successful"); })
+        .catch(e => {
+            vscode.window.showErrorMessage("Upload Failed: " + e.message);
+            if (e.code == "ETIMEDOUT") enterServerIP();
+        });
+    });
     readConf();
 }
 
@@ -280,23 +370,30 @@ async function enterNameFilter() {
 
 function langDir(l = filter.lang) { return l == "*" || l == "en" ? "docs" : "docs-" + l; }
 
-/** @type {(lang:string, ver:string, scope:string, name:string) => string} */
-function getServerPath(lang, ver, scope, name) {
+/** @type {(lang:string, ver:string) => string} */
+function getDocsPath(lang, ver) {
     const subPath = ["out"];
     const langs = Object.keys(conf.langs);
     subPath.push(langDir(lang == "*" ? langs[0] : lang));
     subPath.push(ver == "*" ? conf.vers[0] : ver);
+    return path.join(folderPath, ...subPath);
+}
+
+/** @type {(lang:string, ver:string, scope:string, name:string) => string} */
+function getServerPath(lang, ver, scope, name) {
+    const docsPath = getDocsPath(lang, ver);
+    const subPath = [docsPath];
 
     if (name == "*")
-        subPath.push(scope == "*" ? "Docs.htm" : conf.scopes[scope].replace(/\s/g, "") + ".htm");
+        subPath.push(scope == "*" ? "Docs.htm" : conf.scopes[scope].replace(/\s+/g, "") + ".htm");
     else {
-        const globPath = path.join(folderPath, ...subPath, scope, '*' + name.replace(/\.\*/g, "*") + '*');
-        const files = glob.sync(globPath, { windowsPathsNoEscape: true });
+        const globPath = path.join(folderPath, ...subPath, scope, '*' + name.replace(/\.\*/g, "*").replace(/\s+/g, '') + '*');
+        const files = glob.sync(globPath, { windowsPathsNoEscape: true, nodir: true, });
         const scopeName = path.basename(path.dirname(files[0] || "*"));
         if (files.length == 1) subPath.push(scopeName, path.basename(files[0]))
         else subPath.push("Docs.htm");
     }
-    return path.join(folderPath, ...subPath);
+    return path.join(...subPath);
 }
 
 async function openWithLiveServer(sfilter = filter) {
@@ -308,17 +405,8 @@ async function openWithLiveServer(sfilter = filter) {
 
 /** @param {vscode.Uri} uri */
 async function generateFile(uri) {
-    const curDoc = vscode.window.activeTextEditor?.document;
-    curDoc?.save();
-    if (!uri && curDoc?.uri) uri = curDoc.uri;
-    const fp = uri.fsPath;
-    const markupPath = path.normalize("Docs/files/markup/");
-    if (!fp.includes(markupPath)) return;
-    // lang/scope/member
-    let s = fp.split(markupPath)[1];
-    let lsm = s.split(path.sep);
-    if (lsm.length !== 3) return;
-    generate({ filter: { scope: lsm[1], name: lsm[2].substring(0, lsm[2].indexOf(".")) } });
+    const fileFilter = util.getFileFilter(uri);
+    if (fileFilter) generate({ filter: fileFilter });
 }
 
 /** @type {vscode.CompletionItemProvider["provideCompletionItems"]} */
